@@ -36,7 +36,6 @@
   .chip .n{color:var(--muted);font-variant-numeric:tabular-nums}
   .chip.done .n{color:#15803d;font-weight:700}
   .chip.me{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-  .chip.focus{background:#eef3fb}
 
   .calendar{display:grid;grid-template-columns:repeat(3,1fr);gap:26px 22px;margin-top:20px}
   @media (max-width:980px){.calendar{grid-template-columns:repeat(2,1fr)}}
@@ -59,7 +58,6 @@
   .lines:not(:empty){padding-bottom:3px}
   .lines i{display:block;height:4px;border-radius:2px;transition:opacity .15s}
   .lines i.draft{background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.6) 0 5px,transparent 5px 10px)}
-  .lines i.dim{opacity:.15}
 
   .notices{display:grid;gap:8px;margin:0 0 12px}
   .notice{padding:9px 14px;border-radius:8px;font-size:.9rem;line-height:1.35;border:1px solid}
@@ -83,7 +81,7 @@
 <div class="wrap">
   <h1>2027</h1>
   <hr class="rule">
-  <p class="intro">Elige tu nombre, marca <strong>hasta 5 semanas</strong> haciendo clic sobre ellas y pulsa «Guardar». Las líneas de color muestran lo que han elegido los demás (solo informativo: puedes coincidir con otros).</p>
+  <p class="intro">Elige tu nombre (en el desplegable o pulsando tu nombre de color), marca <strong>hasta 5 semanas</strong> haciendo clic sobre ellas y pulsa «Guardar». Las líneas de color muestran lo que han elegido los demás (solo informativo: puedes coincidir con otros).</p>
   <div class="notices">
     <div class="notice red">⛔ <strong>Julio, agosto y diciembre:</strong> en estos meses no está permitido coger vacaciones (semanas 27 a 34 y 48 a 52, bloqueadas en el calendario).</div>
     <div class="notice amber">⚠️ Las vacaciones <strong>no se pueden solapar</strong> con las de compañeros del mismo centro logístico. Revisa las líneas de color antes de elegir.</div>
@@ -206,7 +204,6 @@ const $ = s => document.querySelector(s);
 let saved = {};
 let me = lsGet("vac2027_me") || "";
 let draft = new Set();
-let focus = null;
 let busy = false;
 
 const sameSet = (set, arr) => { arr = arr || []; return set.size === arr.length && arr.every(x => set.has(x)); };
@@ -235,7 +232,7 @@ function monthHTML(m) {
       const hol = HOLIDAYS[key(d)];
       cells += `<div class="d${hol ? " hol" + (hol.loc ? " loc" : "") : ""}"${hol ? ` title="${hol.n}"` : ""}>${d.getUTCDate()}</div>`;
     }
-    const lines = who.map(w => `<i class="${w.draft ? "draft" : ""}${focus && focus !== w.name ? " dim" : ""}" style="background-color:${COLOR[w.name]}" title="${w.name}"></i>`).join("");
+    const lines = who.map(w => `<i class="${w.draft ? "draft" : ""}" style="background-color:${COLOR[w.name]}" title="${w.name}"></i>`).join("");
     const blocked = isBlockedWeek(s);
     const isSel = !blocked && me && draft.has(wk);
     const style = isSel ? ` style="--me:${COLOR[me]};--meink:${ink(COLOR[me])}"` : "";
@@ -255,7 +252,7 @@ function renderLegend() {
   $("#legend").innerHTML = PEOPLE.map(p => {
     const n = p.name === me ? draft.size : (saved[p.name] || []).length;
     const done = n === WEEKS_REQUIRED;
-    return `<button type="button" class="chip${done ? " done" : ""}${p.name === me ? " me" : ""}${focus === p.name ? " focus" : ""}" data-name="${p.name}" title="Clic para resaltar sus semanas">` +
+    return `<button type="button" class="chip${done ? " done" : ""}${p.name === me ? " me" : ""}" data-name="${p.name}" title="Clic para elegir este nombre">` +
            `<span class="sw" style="background:${p.color}"></span>${p.name} <span class="n">${n}/${WEEKS_REQUIRED}${done ? " ✓" : ""}</span></button>`;
   }).join("");
 }
@@ -328,6 +325,20 @@ async function load(first) {
   }
 }
 
+function selectPerson(name) {
+  const sel = $("#who");
+  if (busy) { sel.value = me; return; }
+  if (name === me) { sel.value = me; return; }
+  if (me && !isLocked() && !sameSet(draft, saved[me]) &&
+      !confirm("Tienes cambios sin guardar. Si cambias de nombre se perderán. ¿Continuar?")) {
+    sel.value = me; return;
+  }
+  me = name; lsSet("vac2027_me", me);
+  sel.value = me;
+  draft = new Set(saved[me] || []);
+  render();
+}
+
 function init() {
   const dl = $("#deadline");
   if (isLocked()) {
@@ -341,11 +352,7 @@ function init() {
   sel.innerHTML = `<option value="">— Elige tu nombre —</option>` + PEOPLE.map(p => `<option>${p.name}</option>`).join("");
   if (!COLOR[me]) me = "";
   sel.value = me;
-  sel.addEventListener("change", () => {
-    me = sel.value; lsSet("vac2027_me", me);
-    draft = new Set(saved[me] || []);
-    render();
-  });
+  sel.addEventListener("change", () => selectPerson(sel.value));
   $("#save").addEventListener("click", save);
   $("#clear").addEventListener("click", () => { draft = new Set(); render(); });
   $("#calendar").addEventListener("click", e => { const w = e.target.closest(".week"); if (w) toggleWeek(w.dataset.wk); });
@@ -354,9 +361,8 @@ function init() {
     const w = e.target.closest(".week"); if (w) { e.preventDefault(); toggleWeek(w.dataset.wk); }
   });
   $("#legend").addEventListener("click", e => {
-    const c = e.target.closest(".chip"); if (!c) return;
-    focus = focus === c.dataset.name ? null : c.dataset.name;
-    render();
+    const c = e.target.closest(".chip");
+    if (c) selectPerson(c.dataset.name);
   });
   load(true);
   setInterval(() => { if (!busy) load(false); }, 60000);
