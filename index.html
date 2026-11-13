@@ -61,6 +61,17 @@
   .lines i.draft{background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.6) 0 5px,transparent 5px 10px)}
   .lines i.dim{opacity:.15}
 
+  .notices{display:grid;gap:8px;margin:0 0 12px}
+  .notice{padding:9px 14px;border-radius:8px;font-size:.9rem;line-height:1.35;border:1px solid}
+  .notice.red{background:#fdecec;border-color:#f3b4b4;color:#7f1d1d}
+  .notice.amber{background:#fff4d6;border-color:#f0d98a;color:#7a5b00}
+  .notice.blue{background:#e8f0fe;border-color:#b9cdf5;color:#1e3a8a}
+  .hint{text-align:center;font-size:.86rem;color:var(--muted);margin-top:6px;min-height:1.1em}
+  .week.blocked{cursor:not-allowed;background:repeating-linear-gradient(45deg,#e6e9ef 0 6px,#f6f7fa 6px 12px)}
+  .week.blocked:hover{background:repeating-linear-gradient(45deg,#e6e9ef 0 6px,#f6f7fa 6px 12px)}
+  .week.blocked .wn{background:#c4cad6;color:#fff}
+  .week.blocked .d:not(.hol){color:#9aa3b2}
+
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;
     background:#111827;color:#fff;padding:10px 18px;border-radius:10px;font-size:.92rem;transition:.25s;z-index:50;max-width:90vw;text-align:center}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -73,6 +84,11 @@
   <h1>2027</h1>
   <hr class="rule">
   <p class="intro">Elige tu nombre, marca <strong>5 semanas</strong> haciendo clic sobre ellas y pulsa «Guardar». Las líneas de color muestran lo que han elegido los demás (solo informativo: puedes coincidir con otros).</p>
+  <div class="notices">
+    <div class="notice red">⛔ <strong>Julio, agosto y diciembre:</strong> en estos meses no está permitido coger vacaciones (semanas 27 a 34 y 48 a 52, bloqueadas en el calendario).</div>
+    <div class="notice amber">⚠️ Las vacaciones <strong>no se pueden solapar</strong> con las de compañeros del mismo centro logístico. Revisa las líneas de color antes de elegir.</div>
+    <div class="notice blue" id="deadline"></div>
+  </div>
   <div class="demo" id="demo">Modo demo: aún no has configurado la URL del Apps Script, los datos se guardan solo en este navegador.</div>
 
   <div class="panel">
@@ -83,6 +99,7 @@
       <button id="clear" type="button">Vaciar</button>
       <button id="save" type="button" class="primary">Guardar selección</button>
     </div>
+    <div class="hint" id="hint"></div>
     <div class="legend" id="legend"></div>
   </div>
 
@@ -93,10 +110,14 @@
 <script>
 /* ============ CONFIGURACIÓN ============ */
 // Pega aquí la URL de la aplicación web de Apps Script (termina en /exec)
-const API_URL = "PEGA_AQUI_LA_URL_DEL_APPS_SCRIPT";
+const API_URL = "https://script.google.com/macros/s/AKfycbygqDkAfrKvkBnwFlmPGnzqStDSnhsg24RS8AoFdrosl46kO_Ymne4hPD-WIADivO0p/exec";
 
 const YEAR = 2027;
 const WEEKS_REQUIRED = 5;
+// Semanas ISO bloqueadas (ambas incluidas): julio-agosto y diciembre
+const BLOCKED_RANGES = [[27, 34], [48, 52]];
+// A partir de esta fecha (hora de Madrid) ya no se puede modificar nada
+const LOCK_DATE = "2026-12-16";
 const PEOPLE = [
   { name: "Dani Gil",   color: "#FF26BE" },
   { name: "Dani Mathe", color: "#7050A8" },
@@ -146,6 +167,9 @@ function isoWeek(mon) {
   return Math.round((mon - w1) / (7 * DAY)) + 1;
 }
 const fmt = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", timeZone: "UTC" });
+const isBlockedWeek = mon => mon >= utc(2027, 0, 4) && BLOCKED_RANGES.some(([a, b]) => { const n = isoWeek(mon); return n >= a && n <= b; });
+const todayMadrid = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date());
+const isLocked = () => todayMadrid() >= LOCK_DATE;
 function ink(hex) {
   const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
   return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? "#111" : "#fff";
@@ -212,10 +236,12 @@ function monthHTML(m) {
       cells += `<div class="d${hol ? " hol" + (hol.loc ? " loc" : "") : ""}"${hol ? ` title="${hol.n}"` : ""}>${d.getUTCDate()}</div>`;
     }
     const lines = who.map(w => `<i class="${w.draft ? "draft" : ""}${focus && focus !== w.name ? " dim" : ""}" style="background-color:${COLOR[w.name]}" title="${w.name}"></i>`).join("");
-    const isSel = me && draft.has(wk);
+    const blocked = isBlockedWeek(s);
+    const isSel = !blocked && me && draft.has(wk);
     const style = isSel ? ` style="--me:${COLOR[me]};--meink:${ink(COLOR[me])}"` : "";
-    const title = `Semana ${num} · ${fmt.format(s)} – ${fmt.format(end)}` + (who.length ? " · " + who.map(w => w.name).join(", ") : "");
-    h += `<div class="week${isSel ? " sel" : ""}" data-wk="${wk}" role="button" tabindex="0" title="${title}"${style}>` +
+    const title = `Semana ${num} · ${fmt.format(s)} – ${fmt.format(end)}` +
+      (blocked ? " · Bloqueada: no se permiten vacaciones" : (who.length ? " · " + who.map(w => w.name).join(", ") : ""));
+    h += `<div class="week${isSel ? " sel" : ""}${blocked ? " blocked" : ""}" data-wk="${wk}"${blocked ? "" : ' role="button" tabindex="0"'} title="${title}"${style}>` +
          `<div class="wn">${num}</div>${cells}<div class="lines">${lines}</div></div>`;
   }
   return h + "</section>";
@@ -238,11 +264,17 @@ function updateControls() {
   const c = $("#counter");
   c.textContent = `${draft.size} / ${WEEKS_REQUIRED} semanas`;
   c.classList.toggle("ok", draft.size === WEEKS_REQUIRED);
+  const locked = isLocked();
   const dirty = me && !sameSet(draft, saved[me]);
+  const has = me && (saved[me] || []).length > 0;
+  $("#hint").textContent = locked ? "Plazo cerrado: ya no se pueden modificar las selecciones."
+    : !me ? ""
+    : has ? (dirty ? "Tienes cambios sin guardar." : "Ya tienes una selección guardada. Puedes modificarla y volver a guardar.")
+    : "Todavía no has guardado tus vacaciones.";
   const save = $("#save");
-  save.disabled = busy || !me || draft.size !== WEEKS_REQUIRED || !dirty;
+  save.disabled = locked || busy || !me || draft.size !== WEEKS_REQUIRED || !dirty;
   save.textContent = busy ? "Guardando…" : (me && !dirty && (saved[me] || []).length ? "Guardado ✓" : "Guardar selección");
-  $("#clear").disabled = busy || !draft.size;
+  $("#clear").disabled = locked || busy || !draft.size;
 }
 
 function render() { renderLegend(); renderCalendar(); updateControls(); }
@@ -260,6 +292,8 @@ function toast(msg, err) {
 
 function toggleWeek(wk) {
   if (busy) return;
+  if (isLocked()) { toast("El plazo para modificar las vacaciones terminó el 15 de diciembre.", true); return; }
+  if (isBlockedWeek(new Date(wk + "T00:00:00Z"))) { toast("Semana bloqueada: en julio, agosto y diciembre no se pueden coger vacaciones.", true); return; }
   if (!me) { toast("Primero elige tu nombre", true); $("#who").focus(); return; }
   if (draft.has(wk)) draft.delete(wk);
   else {
@@ -271,7 +305,7 @@ function toggleWeek(wk) {
 
 async function save() {
   if (busy || !me || draft.size !== WEEKS_REQUIRED) return;
-  if ((saved[me] || []).length && !confirm(`${me}, ya tenías una selección guardada. ¿Quieres sustituirla por esta?`)) return;
+  if (isLocked()) { toast("El plazo para modificar las vacaciones ya ha terminado.", true); return; }
   busy = true; updateControls();
   try {
     saved = await apiSave(me, [...draft].sort());
@@ -294,6 +328,13 @@ async function load(first) {
 }
 
 function init() {
+  const dl = $("#deadline");
+  if (isLocked()) {
+    dl.className = "notice red";
+    dl.textContent = "🔒 El plazo ha terminado: desde el 16 de diciembre ya no se pueden modificar las selecciones.";
+  } else {
+    dl.innerHTML = "🗓️ Puedes modificar tu selección las veces que quieras: elige tu nombre, cambia las semanas y vuelve a guardar. <strong>A partir del 16 de diciembre</strong> ya no se podrá modificar.";
+  }
   if (DEMO) $("#demo").style.display = "block";
   const sel = $("#who");
   sel.innerHTML = `<option value="">— Elige tu nombre —</option>` + PEOPLE.map(p => `<option>${p.name}</option>`).join("");
