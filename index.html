@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vacaciones 2027</title>
+<style>
+  :root{
+    --bg:#f4f6fa; --card:#fff; --ink:#1f2937; --muted:#6b7280;
+    --head:#93b0d6; --headink:#1f2d4a; --wk:#dbe4f1; --wkink:#2f5d8a;
+    --line:#cfd6e2; --accent:#2b3a8f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 16px 40px}
+  h1{margin:24px 0 6px;text-align:center;color:var(--accent);font-weight:500;font-size:2.4rem;letter-spacing:.02em}
+  .rule{border:0;border-top:1px solid #111;margin:0 0 10px}
+  .intro{margin:0 0 12px;color:var(--muted);font-size:.92rem;text-align:center}
+  .demo{display:none;margin:0 0 10px;padding:8px 12px;border-radius:8px;background:#fff4d6;border:1px solid #f0d98a;color:#7a5b00;font-size:.88rem;text-align:center}
+
+  .panel{position:sticky;top:0;z-index:20;background:var(--bg);padding:10px 0 8px;border-bottom:1px solid var(--line)}
+  .controls{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:center}
+  .controls label{font-weight:600}
+  select{font:inherit;padding:8px 12px;border-radius:8px;border:1px solid #b9c3d4;background:#fff;min-width:200px}
+  .counter{font-weight:600;padding:6px 12px;border-radius:999px;background:#e8edf6}
+  .counter.ok{background:#d9f4de;color:#14532d}
+  button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid #b9c3d4;background:#fff;padding:8px 14px}
+  button:hover:not(:disabled){background:#eef3fb}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.primary:hover:not(:disabled){background:#222f78}
+  button:disabled{opacity:.45;cursor:not-allowed}
+
+  .legend{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
+  .chip{display:flex;align-items:center;gap:7px;padding:4px 10px 4px 5px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:.85rem}
+  .chip .sw{width:22px;height:10px;border-radius:3px;border:1px solid rgba(0,0,0,.15)}
+  .chip .n{color:var(--muted);font-variant-numeric:tabular-nums}
+  .chip.done .n{color:#15803d;font-weight:700}
+  .chip.me{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .chip.focus{background:#eef3fb}
+
+  .calendar{display:grid;grid-template-columns:repeat(3,1fr);gap:26px 22px;margin-top:20px}
+  @media (max-width:980px){.calendar{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:640px){.calendar{grid-template-columns:1fr}h1{font-size:1.9rem}}
+
+  .month{background:var(--card);border:1px solid var(--line);align-self:start}
+  .month h3{margin:0;padding:5px;text-align:center;background:var(--head);color:var(--headink);font-size:.95rem}
+  .hdr,.week{display:grid;grid-template-columns:36px repeat(7,1fr)}
+  .hdr span{background:var(--wk);color:var(--wkink);font-size:.68rem;font-weight:700;text-align:center;padding:4px 0}
+  .week{cursor:pointer;border-top:1px solid var(--line);outline-offset:-2px;transition:background .12s}
+  .week:focus-visible{outline:2px solid var(--accent)}
+  .week:hover{background:#f1f5fb}
+  .week.sel{background:color-mix(in srgb,var(--me) 22%,#fff)}
+  .wn{background:var(--wk);color:var(--wkink);font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .week.sel .wn{background:var(--me);color:var(--meink)}
+  .d{text-align:center;padding:5px 0;font-size:.82rem;font-variant-numeric:tabular-nums;border-left:1px solid #edf0f5}
+  .d.hol{background:#ff0000;color:#fff;font-weight:700}
+  .d.hol.loc{background:#8b0000}
+  .lines{grid-column:2 / 9;display:flex;flex-direction:column;gap:1px;padding:0 2px}
+  .lines:not(:empty){padding-bottom:3px}
+  .lines i{display:block;height:4px;border-radius:2px;transition:opacity .15s}
+  .lines i.draft{background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.6) 0 5px,transparent 5px 10px)}
+  .lines i.dim{opacity:.15}
+
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;
+    background:#111827;color:#fff;padding:10px 18px;border-radius:10px;font-size:.92rem;transition:.25s;z-index:50;max-width:90vw;text-align:center}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.err{background:#b91c1c}
+  .loading{text-align:center;color:var(--muted);padding:40px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>2027</h1>
+  <hr class="rule">
+  <p class="intro">Elige tu nombre, marca <strong>5 semanas</strong> haciendo clic sobre ellas y pulsa «Guardar». Las líneas de color muestran lo que han elegido los demás (solo informativo: puedes coincidir con otros).</p>
+  <div class="demo" id="demo">Modo demo: aún no has configurado la URL del Apps Script, los datos se guardan solo en este navegador.</div>
+
+  <div class="panel">
+    <div class="controls">
+      <label for="who">¿Quién eres?</label>
+      <select id="who"></select>
+      <span class="counter" id="counter">0 / 5 semanas</span>
+      <button id="clear" type="button">Vaciar</button>
+      <button id="save" type="button" class="primary">Guardar selección</button>
+    </div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="calendar" id="calendar"><div class="loading">Cargando…</div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ CONFIGURACIÓN ============ */
+// Pega aquí la URL de la aplicación web de Apps Script (termina en /exec)
+const API_URL = "PEGA_AQUI_LA_URL_DEL_APPS_SCRIPT";
+
+const YEAR = 2027;
+const WEEKS_REQUIRED = 5;
+const PEOPLE = [
+  { name: "Dani Gil",   color: "#FF26BE" },
+  { name: "Dani Mathe", color: "#7050A8" },
+  { name: "Alex",       color: "#FF66CC" },
+  { name: "Miguel",     color: "#FFC000" },
+  { name: "Berni",      color: "#243F60" },
+  { name: "Jonathan",   color: "#00FFFF" },
+  { name: "Pedro",      color: "#FF6600" },
+  { name: "Luigi",      color: "#D98170" },
+  { name: "Raúl",       color: "#00E100" },
+  { name: "Víctor",     color: "#0000FF" },
+  { name: "Lucas",      color: "#A6A6A6" },
+  { name: "Virgil",     color: "#274E13" },
+  { name: "Yuri",       color: "#FFFF00" }
+];
+// Festivos (loc = autonómico/local, se pinta en rojo oscuro)
+const HOLIDAYS = {
+  "2027-01-01": { n: "Año Nuevo" },
+  "2027-01-06": { n: "Reyes" },
+  "2027-03-19": { n: "San José", loc: true },
+  "2027-03-26": { n: "Viernes Santo" },
+  "2027-03-29": { n: "Lunes de Pascua", loc: true },
+  "2027-05-01": { n: "Día del Trabajo" },
+  "2027-10-09": { n: "Día de la Comunitat Valenciana", loc: true },
+  "2027-10-12": { n: "Fiesta Nacional" },
+  "2027-11-01": { n: "Todos los Santos" },
+  "2027-12-06": { n: "Día de la Constitución" },
+  "2027-12-08": { n: "Inmaculada Concepción" },
+  "2027-12-25": { n: "Navidad" }
+};
+/* ======================================= */
+
+const MONTHS = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const LETTERS = ["L","M","X","J","V","S","D"];
+const DAY = 864e5;
+const DEMO = !API_URL || API_URL.includes("PEGA_AQUI");
+const DEMO_KEY = "vac2027_demo";
+const COLOR = Object.fromEntries(PEOPLE.map(p => [p.name, p.color]));
+
+/* ---------- fechas (todo en UTC) ---------- */
+const utc = (y, m, d) => new Date(Date.UTC(y, m, d));
+const key = d => d.toISOString().slice(0, 10);
+const mondayOf = d => { const x = new Date(d.getTime()); x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7)); return x; };
+function isoWeek(mon) {
+  const th = new Date(mon.getTime() + 3 * DAY);
+  const w1 = mondayOf(utc(th.getUTCFullYear(), 0, 4));
+  return Math.round((mon - w1) / (7 * DAY)) + 1;
+}
+const fmt = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", timeZone: "UTC" });
+function ink(hex) {
+  const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? "#111" : "#fff";
+}
+
+/* ---------- almacenamiento local (recordar nombre / modo demo) ---------- */
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+
+/* ---------- API ---------- */
+async function apiList() {
+  if (DEMO) { try { return JSON.parse(lsGet(DEMO_KEY) || "{}"); } catch (e) { return {}; } }
+  const r = await fetch(`${API_URL}?action=list&t=${Date.now()}`);
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || "Error del servidor");
+  return j.selections || {};
+}
+async function apiSave(name, weeks) {
+  if (DEMO) {
+    const all = await apiList();
+    all[name] = weeks;
+    lsSet(DEMO_KEY, JSON.stringify(all));
+    return all;
+  }
+  // Sin cabecera Content-Type para evitar el preflight CORS de Apps Script
+  const r = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "save", name, weeks }) });
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || "Error del servidor");
+  return j.selections || {};
+}
+
+/* ---------- estado ---------- */
+const $ = s => document.querySelector(s);
+let saved = {};
+let me = lsGet("vac2027_me") || "";
+let draft = new Set();
+let focus = null;
+let busy = false;
+
+const sameSet = (set, arr) => { arr = arr || []; return set.size === arr.length && arr.every(x => set.has(x)); };
+
+/* ---------- render ---------- */
+function peopleOnWeek(wk) {
+  const out = [];
+  for (const p of PEOPLE) {
+    if (p.name === me) { if (draft.has(wk)) out.push({ name: p.name, draft: !(saved[p.name] || []).includes(wk) }); }
+    else if ((saved[p.name] || []).includes(wk)) out.push({ name: p.name, draft: false });
+  }
+  return out;
+}
+
+function monthHTML(m) {
+  const first = utc(YEAR, m, 1), last = utc(YEAR, m + 1, 0);
+  let h = `<section class="month"><h3>${MONTHS[m]}</h3><div class="hdr"><span>Sem.</span>${LETTERS.map(l => `<span>${l}</span>`).join("")}</div>`;
+  for (let s = mondayOf(first); s <= last; s = new Date(s.getTime() + 7 * DAY)) {
+    const wk = key(s), num = isoWeek(s);
+    const end = new Date(s.getTime() + 6 * DAY);
+    const who = peopleOnWeek(wk);
+    let cells = "";
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(s.getTime() + i * DAY);
+      if (d.getUTCMonth() !== m) { cells += `<div class="d"></div>`; continue; }
+      const hol = HOLIDAYS[key(d)];
+      cells += `<div class="d${hol ? " hol" + (hol.loc ? " loc" : "") : ""}"${hol ? ` title="${hol.n}"` : ""}>${d.getUTCDate()}</div>`;
+    }
+    const lines = who.map(w => `<i class="${w.draft ? "draft" : ""}${focus && focus !== w.name ? " dim" : ""}" style="background-color:${COLOR[w.name]}" title="${w.name}"></i>`).join("");
+    const isSel = me && draft.has(wk);
+    const style = isSel ? ` style="--me:${COLOR[me]};--meink:${ink(COLOR[me])}"` : "";
+    const title = `Semana ${num} · ${fmt.format(s)} – ${fmt.format(end)}` + (who.length ? " · " + who.map(w => w.name).join(", ") : "");
+    h += `<div class="week${isSel ? " sel" : ""}" data-wk="${wk}" role="button" tabindex="0" title="${title}"${style}>` +
+         `<div class="wn">${num}</div>${cells}<div class="lines">${lines}</div></div>`;
+  }
+  return h + "</section>";
+}
+
+function renderCalendar() {
+  $("#calendar").innerHTML = MONTHS.map((_, m) => monthHTML(m)).join("");
+}
+
+function renderLegend() {
+  $("#legend").innerHTML = PEOPLE.map(p => {
+    const n = p.name === me ? draft.size : (saved[p.name] || []).length;
+    const done = n === WEEKS_REQUIRED;
+    return `<button type="button" class="chip${done ? " done" : ""}${p.name === me ? " me" : ""}${focus === p.name ? " focus" : ""}" data-name="${p.name}" title="Clic para resaltar sus semanas">` +
+           `<span class="sw" style="background:${p.color}"></span>${p.name} <span class="n">${n}/${WEEKS_REQUIRED}${done ? " ✓" : ""}</span></button>`;
+  }).join("");
+}
+
+function updateControls() {
+  const c = $("#counter");
+  c.textContent = `${draft.size} / ${WEEKS_REQUIRED} semanas`;
+  c.classList.toggle("ok", draft.size === WEEKS_REQUIRED);
+  const dirty = me && !sameSet(draft, saved[me]);
+  const save = $("#save");
+  save.disabled = busy || !me || draft.size !== WEEKS_REQUIRED || !dirty;
+  save.textContent = busy ? "Guardando…" : (me && !dirty && (saved[me] || []).length ? "Guardado ✓" : "Guardar selección");
+  $("#clear").disabled = busy || !draft.size;
+}
+
+function render() { renderLegend(); renderCalendar(); updateControls(); }
+
+/* ---------- interacciones ---------- */
+let toastTimer;
+function toast(msg, err) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.toggle("err", !!err);
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), err ? 4500 : 2500);
+}
+
+function toggleWeek(wk) {
+  if (busy) return;
+  if (!me) { toast("Primero elige tu nombre", true); $("#who").focus(); return; }
+  if (draft.has(wk)) draft.delete(wk);
+  else {
+    if (draft.size >= WEEKS_REQUIRED) { toast(`Ya has elegido ${WEEKS_REQUIRED} semanas. Quita una para cambiarla.`, true); return; }
+    draft.add(wk);
+  }
+  render();
+}
+
+async function save() {
+  if (busy || !me || draft.size !== WEEKS_REQUIRED) return;
+  if ((saved[me] || []).length && !confirm(`${me}, ya tenías una selección guardada. ¿Quieres sustituirla por esta?`)) return;
+  busy = true; updateControls();
+  try {
+    saved = await apiSave(me, [...draft].sort());
+    toast("¡Selección guardada!");
+  } catch (e) {
+    toast("No se pudo guardar: " + e.message, true);
+  }
+  busy = false; render();
+}
+
+async function load(first) {
+  try {
+    saved = await apiList();
+    if (first) draft = new Set(saved[me] || []);
+    render();
+  } catch (e) {
+    if (first) $("#calendar").innerHTML = `<div class="loading">No se pudieron cargar los datos (${e.message}). Recarga la página.</div>`;
+    else toast("No se pudo actualizar: " + e.message, true);
+  }
+}
+
+function init() {
+  if (DEMO) $("#demo").style.display = "block";
+  const sel = $("#who");
+  sel.innerHTML = `<option value="">— Elige tu nombre —</option>` + PEOPLE.map(p => `<option>${p.name}</option>`).join("");
+  if (!COLOR[me]) me = "";
+  sel.value = me;
+  sel.addEventListener("change", () => {
+    me = sel.value; lsSet("vac2027_me", me);
+    draft = new Set(saved[me] || []);
+    render();
+  });
+  $("#save").addEventListener("click", save);
+  $("#clear").addEventListener("click", () => { draft = new Set(); render(); });
+  $("#calendar").addEventListener("click", e => { const w = e.target.closest(".week"); if (w) toggleWeek(w.dataset.wk); });
+  $("#calendar").addEventListener("keydown", e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const w = e.target.closest(".week"); if (w) { e.preventDefault(); toggleWeek(w.dataset.wk); }
+  });
+  $("#legend").addEventListener("click", e => {
+    const c = e.target.closest(".chip"); if (!c) return;
+    focus = focus === c.dataset.name ? null : c.dataset.name;
+    render();
+  });
+  load(true);
+  setInterval(() => { if (!busy) load(false); }, 60000);
+}
+init();
+</script>
+</body>
+</html>
